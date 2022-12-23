@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         AnimatedCaptions
-// @version      2022.12.21.1
+// @version      2022.12.21.2
 // @description  Enables native on-screen captions in videos.
 // @author       skarm
 // @source       https://danbooru.donmai.us/users/970979
@@ -173,6 +173,30 @@ const CREATE_AND_ATTACH_SUBTITLES = (vttData) => {
     Danbooru.notice("Subtitles attached!", false);
 };
 
+const CHECK_FOR_WEBVTT_LINKS = () => {
+    // TODO search comments section too but:
+    //      1. link present in commentary takes precedent
+    //      2. if no link is present in commentary, the latest comment takes precedent
+    // const COMMENTS_SECTION = document.querySelector("#comments");
+
+    // Capture links in format "WebVTT":[<any HTTP link>]
+    const COMMENTARY_LINKS = document.querySelectorAll("#artist-commentary a");
+    for (const LINK of COMMENTARY_LINKS) {
+        if (LINK.innerHTML !== "WebVTT") continue;
+
+        // Grab the link (example: "https://pastebin.com/raw/6KHsSVh7")
+        const URL = LINK.getAttribute("href");
+        DEBUG_LOG(`WebVTT link detected in artist commentary ${URL}`);
+        Danbooru.notice("WebVTT link detected in artist commentary. Subtitles will be attached automatically.", false);
+
+        const INPUT_BOX = document.querySelector("#subtitle-source-input");
+        INPUT_BOX.value = URL;
+        VALIDATE_LINK();
+
+        return;
+    }
+};
+
 // ------------------------------------ MAIN ------------------------------------
 
 const MAIN = () => {
@@ -180,6 +204,7 @@ const MAIN = () => {
     console.log("%cAnimatedCaptions v2022.12.21.0%c", "color: gold; font-size: 14px;");
 
     INJECT_USER_INTERFACE();
+    CHECK_FOR_WEBVTT_LINKS();
 };
 
 MAIN();
