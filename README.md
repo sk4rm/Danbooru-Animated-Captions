@@ -4,7 +4,7 @@
 
 [Demo post #5843334](https://danbooru.donmai.us/posts/5843334) | [Demo DMail link](https://danbooru.donmai.us/dmails/2224057?key=eyJfcmFpbHMiOnsibWVzc2FnZSI6Ik1qSXlOREExTnc9PSIsImV4cCI6bnVsbCwicHVyIjoiZG1haWxfbGluayJ9fQ%3D%3D--bdbc83bccd4f96e369a9985ef2664286fec0722b7a7c4ad5fc321c674d881a28) | [Demo gist link](https://gist.github.com/sk4rm/05d5fd19dec2b762a5cb179073f26454/raw/f75486964cad5d66be4a148ec0e23ce664f5012e/post%2520%25235843334.vtt) | [Demo pastebin link](https://pastebin.com/raw/6KHsSVh7)
 
-<img src="https://i.imgur.com/dBijNdw.gif" controls style="width: 100%;">
+https://user-images.githubusercontent.com/74897601/209259027-b4a48a13-e981-4171-9e55-51531254faf2.mp4
 
 ## **Installation**
 
