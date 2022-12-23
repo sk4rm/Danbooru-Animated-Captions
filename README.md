@@ -6,6 +6,8 @@
 
 https://user-images.githubusercontent.com/74897601/209259027-b4a48a13-e981-4171-9e55-51531254faf2.mp4
 
+**Other example posts:** [posts #4287071](https://danbooru.donmai.us/posts/4287071) | [posts #4345939](https://danbooru.donmai.us/posts/4345939)
+
 ## **Installation**
 
 1. Install [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en) or [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/).
@@ -24,10 +26,18 @@ In any post that contains a `.mp4` or `.webm` content, there will be an input bo
 
 3. The video should now have subtitles in the controls (CC icon).
 
-*As of v2022.12.22.2, WebVTT source file links in the artist commentary will be auto-detected. The link must be formatted as a DText hyperlink with the custom text "WebVTT". Check the translated commentary section in [post #5843334](https://danbooru.donmai.us/posts/5843334).*
+*As of v2022.12.22.2, WebVTT source file links in the artist commentary will be auto-detected. The link must be formatted as a DText hyperlink with the custom text "WebVTT". For example, check the translated commentary section in [post #5843334](https://danbooru.donmai.us/posts/5843334).*
 
 ## **For subtitlers**
 
 If you would like to create VTT subtitle files manually via a text editor, you can check out [the MDN documentation for WebVTT](https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API) for the syntax as well as CSS styling options.
 
-Alternatively, there are subtitle editor softwares out there that export to `.vtt`, such as [VTT Creator](https://www.vtt-creator.com/)(web-based) or [SubtitleEdit](https://github.com/SubtitleEdit/subtitleedit)(downloadable software).
+Alternatively, there are subtitle editor softwares out there that export to `.vtt`, such as [VTT Creator](https://www.vtt-creator.com/) (web-based) or [SubtitleEdit](https://github.com/SubtitleEdit/subtitleedit) (downloadable software).
+
+## **For non-users**
+
+In order to cater towards users who aren't using the script, subtitlers would have to rewrite the time-stamped text in the artist commentary section in addition to the WebVTT file. For that, I'm thinking of adding a generator that can convert `.vtt` into simpler, human-readable format.
+
+## **Known issues**
+
+1. Auto-detection not working in Safari Userscript
