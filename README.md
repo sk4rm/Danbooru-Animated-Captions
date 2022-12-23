@@ -22,8 +22,12 @@ In any post that contains a `.mp4` or `.webm` content, there will be an input bo
 
 2. Click on the `Apply subtitles!` button.
 
-3. The video should now include options for closed captions in the controls.
+3. The video should now have subtitles in the controls (CC icon).
 
-## **For translators**
+*As of v2022.12.22.2, WebVTT source file links in the artist commentary will be auto-detected. The link must be formatted as a DText hyperlink with the custom text "WebVTT". Check the translated commentary section in [post #5843334](https://danbooru.donmai.us/posts/5843334).*
 
-Translators can check out [the MDN documentation for WebVTT](https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API) for the syntax as well as CSS styling options.
+## **For subtitlers**
+
+If you would like to create VTT subtitle files manually via a text editor, you can check out [the MDN documentation for WebVTT](https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API) for the syntax as well as CSS styling options.
+
+Alternatively, there are subtitle editor softwares out there that export to `.vtt`, such as [VTT Creator](https://www.vtt-creator.com/)(web-based) or [SubtitleEdit](https://github.com/SubtitleEdit/subtitleedit)(downloadable software).
