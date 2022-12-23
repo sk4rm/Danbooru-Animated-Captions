@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         AnimatedCaptions
-// @version      2022.12.21.2
+// @version      2022.12.22.2
 // @description  Enables native on-screen captions in videos.
 // @author       skarm
 // @source       https://danbooru.donmai.us/users/970979
