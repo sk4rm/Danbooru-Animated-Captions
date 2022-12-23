@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         AnimatedCaptions
-// @version      2022.12.21.0
+// @version      2022.12.21.1
 // @description  Enables native on-screen captions in videos.
 // @author       skarm
 // @source       https://danbooru.donmai.us/users/970979
 // @match        https://*.donmai.us/posts/*
 // @exclude      /^https?://\w+\.donmai\.us/.*\.(xml|json|atom)(\?|$)/
-// @grant        none
+// @grant        GM.xmlHttpRequest
+// @connect      gist.githubusercontent.com
+// @connect      pastebin.com
+// @connect      *
 // ==/UserScript==
 
 // ----------------------------------- CONFIG -----------------------------------
@@ -18,14 +21,14 @@ const VALID_FILE_TYPES = [ ".mp4", ".webm" ];
 
 const INPUT_BOX_AND_BUTTON = `
 <div id="animated-captions-ui" style="display: flex;">
-    <input id="subtitle-source-input" placeholder="Paste DMail link to VTT subtitle text here." style="width:100%">
+    <input id="subtitle-source-input" placeholder="Paste link to raw VTT subtitles here." style="width:100%">
     <button id="subtitle-source-submit" style="width:auto;padding-top: 1px;padding-bottom: 1px;">Apply subtitles!</button>
 </div>
 `;
 
 // ------------------------------ HELPER FUNCTIONS ------------------------------
 
-const IS_ANIMATED = () => {
+const IS_VIDEO = () => {
     for (const filetype of VALID_FILE_TYPES) {
         if (document.querySelector("#post-info-size").innerText.includes(filetype)) return true;
     }
@@ -34,16 +37,66 @@ const IS_ANIMATED = () => {
     return false;
 };
 
-const DEBUG_LOG = text => {
+const DEBUG_LOG = (text) => {
     if (!DEBUG_MODE_ENABLED) return;
     console.log(`${text}`);
 };
 
-// HTML subtitles requires the subtitile files to come from the same
-// domain/origin for security purposes.
-// Tried using pastebin and other sites to bypass CORS but to no avail,
-// so I decided to resort to dmails to host subtitle files.
-const GET_VTT_FROM_DMAIL = dmailLink => {
+const NOTIFY_INVALID_LINK = (additionalContext = "") => {
+    Danbooru.notice(`Invalid link provided. ${additionalContext}`, false);
+}
+
+// ------------------------------------------------------------------------------
+
+const INJECT_USER_INTERFACE = () => {
+    DEBUG_LOG("Injecting input box above video player...");
+    const CONTENT_SECTION = document.querySelector("#content");
+    CONTENT_SECTION.innerHTML = INPUT_BOX_AND_BUTTON + CONTENT_SECTION.innerHTML;
+    if (document.querySelector("#animated-captions-ui")) DEBUG_LOG("Input box injected!");
+
+    // Inject functionality
+    const SUBMIT_BUTTON = document.querySelector("#subtitle-source-submit");
+    const INPUT_BOX = document.querySelector("#subtitle-source-input");
+    SUBMIT_BUTTON.onclick = VALIDATE_LINK;
+    INPUT_BOX.onkeydown = e => { if (e.key === "Enter") VALIDATE_LINK(); };
+};
+
+const VALIDATE_LINK = () => {
+    const INPUT_BOX = document.querySelector("#subtitle-source-input");
+    const URL = INPUT_BOX.value;
+    DEBUG_LOG("Checking URL: " + URL);
+
+    // data:text/vtt URLs
+    if (URL.startsWith("data:text/vtt,")) {
+        CREATE_AND_ATTACH_SUBTITLES(URL);
+        return;
+    }
+
+    // Empty strings
+    if (!URL.trim()) {
+        DEBUG_LOG("Empty link given");
+        NOTIFY_INVALID_LINK();
+        return;
+    }
+
+    // Non-HTTP URLs
+    if (!URL.startsWith("http")) {
+        DEBUG_LOG("Link given is not a valid HTTP URL");
+        NOTIFY_INVALID_LINK();
+        return;
+    }
+
+    // DMail
+    if (URL.startsWith("https://danbooru.donmai.us/dmails/")) {
+        GET_VTT_FROM_DMAIL(URL);
+        return;
+    }
+
+    // External (e.g. raw pastebin, raw gist)
+    GET_VTT_FROM_EXTERNAL(URL);
+};
+
+const GET_VTT_FROM_DMAIL = (dmailLink) => {
     DEBUG_LOG("Generating IFrame that links to DMail...");
     const IFRAME = document.createElement("iframe");
     IFRAME.src = dmailLink;
@@ -54,10 +107,20 @@ const GET_VTT_FROM_DMAIL = dmailLink => {
 
     // Get data from iframe then delete
     DEBUG_LOG("Extracting text from DMail...");
-    document.querySelector("#subtitles-source").onload = EXTRACT_AND_ENCODE_VTT;
+    document.querySelector("#subtitles-source").onload = PROCESS_VTT_FROM_DMAIL;
 };
 
-const EXTRACT_AND_ENCODE_VTT = () => {
+const GET_VTT_FROM_EXTERNAL = (url) => {
+    DEBUG_LOG(`Performing HTTP request to ${url}...`);
+    GM.xmlHttpRequest({
+        method: "GET",
+        url: url,
+        onload: res => { PROCESS_VTT_FROM_EXTERNAL(res); }
+    });
+};
+
+// Legacy (uses iframes)
+const PROCESS_VTT_FROM_DMAIL = () => {
     const DMAIL_IFRAME = document.querySelector("#subtitles-source");
     const RAW_VTT = DMAIL_IFRAME.contentWindow.document.querySelector("div.prose").innerText;
 
@@ -73,7 +136,20 @@ const EXTRACT_AND_ENCODE_VTT = () => {
     CREATE_AND_ATTACH_SUBTITLES(`data:text/vtt,${ENCODED_VTT}`);
 };
 
-const CREATE_AND_ATTACH_SUBTITLES = vttData => {
+// GM.xmlHttpRequest onload callback
+const PROCESS_VTT_FROM_EXTERNAL = (xhr) => {
+    const RAW_VTT = xhr.responseText;
+    if (!RAW_VTT.startsWith("WEBVTT")) {
+        DEBUG_LOG("Linked file doesn't seem like a valid WEBVTT format. Aborting...");
+        NOTIFY_INVALID_LINK();
+        return;
+    }
+
+    const ENCODED_VTT = RAW_VTT.split("\n").join("%0A");
+    CREATE_AND_ATTACH_SUBTITLES(`data:text/vtt,${ENCODED_VTT}`);
+};
+
+const CREATE_AND_ATTACH_SUBTITLES = (vttData) => {
     const VIDEO_ELEMENT = document.querySelector("video#image");
     if (!VIDEO_ELEMENT) { DEBUG_LOG("Unable to get video element!"); return; }
 
@@ -83,48 +159,24 @@ const CREATE_AND_ATTACH_SUBTITLES = vttData => {
     SUBTITLES.srclang = "en";
     SUBTITLES.label = "English";
     SUBTITLES.default = true;
+
+    const EXISTING_SUBTITLES = document.querySelector("track#subtitle-track");
+    // If there are existing subs, remove them first
+    if (!!EXISTING_SUBTITLES) {
+        DEBUG_LOG("Existing subtitles detected and will be overridden!");
+        EXISTING_SUBTITLES.remove();
+    }
+    SUBTITLES.id = "subtitle-track"
     VIDEO_ELEMENT.appendChild(SUBTITLES);
 
     DEBUG_LOG("Subtitles attached!");
     Danbooru.notice("Subtitles attached!", false);
 };
 
-// Add a button near the favourite button that promps for VTT DMail link
-const INJECT_USER_INTERFACE = () => {
-    DEBUG_LOG("Injecting link input box above video player...");
-    const CONTENT_SECTION = document.querySelector("#content");
-    CONTENT_SECTION.innerHTML = INPUT_BOX_AND_BUTTON + CONTENT_SECTION.innerHTML;
-    if (document.querySelector("#animated-captions-ui")) DEBUG_LOG("Input box injected!");
-
-    const SUBMIT_BUTTON = document.querySelector("#subtitle-source-submit");
-    const INPUT_BOX = document.querySelector("#subtitle-source-input");
-
-    SUBMIT_BUTTON.onclick = () => {
-        const DMAIL_LINK = INPUT_BOX.value;
-        DEBUG_LOG("Received submission: " + DMAIL_LINK);
-        if (IS_LINK_VALID(DMAIL_LINK)) {
-            GET_VTT_FROM_DMAIL(DMAIL_LINK);
-            return;
-        }
-        Danbooru.notice("Invalid link provided. Please ensure the link is copied from \"Share\" below the DMail page.", false);
-    };
-
-
-};
-
-const IS_LINK_VALID = dmailLink => {
-    const URL_PREFIX = "https://danbooru.donmai.us/dmails/";
-
-    if (dmailLink === URL_PREFIX) return false;
-    if (!dmailLink.startsWith(URL_PREFIX)) return false;
-
-    return true;
-};
-
 // ------------------------------------ MAIN ------------------------------------
 
 const MAIN = () => {
-    if (!IS_ANIMATED()) return;
+    if (!IS_VIDEO()) return;
     console.log("%cAnimatedCaptions v2022.12.21.0%c", "color: gold; font-size: 14px;");
 
     INJECT_USER_INTERFACE();
