@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         AnimatedCaptions
-// @version      2022.12.22.2
+// @version      2022.12.23.1
 // @description  Enables native on-screen captions in videos.
 // @author       skarm
+// @downloadURL  https://github.com/sk4rm/Danbooru-Animated-Captions/raw/main/AnimatedCaptions.user.js
+// @updateURL    https://github.com/sk4rm/Danbooru-Animated-Captions/raw/main/AnimatedCaptions.user.js
 // @source       https://danbooru.donmai.us/users/970979
 // @match        https://*.donmai.us/posts/*
 // @exclude      /^https?://\w+\.donmai\.us/.*\.(xml|json|atom)(\?|$)/
@@ -19,10 +21,11 @@ const VALID_FILE_TYPES = [ ".mp4", ".webm" ];
 
 // ------------------------------- USER INTERFACE -------------------------------
 
-const INPUT_BOX_AND_BUTTON = `
+const INPUT_BOX_AND_BUTTONS = `
 <div id="animated-captions-ui" style="display: flex;">
     <input id="subtitle-source-input" placeholder="Paste link to raw VTT subtitles here." style="width:100%">
-    <button id="subtitle-source-submit" style="width:auto;padding-top: 1px;padding-bottom: 1px;">Apply subtitles!</button>
+    <button id="subtitle-source-submit" style="width:auto;border-radius:0;border-left:0;" disabled>Apply subtitles</button>
+    <button id="subtitle-source-copy" style="width:auto;border-radius:0;border-left:0" disabled>Copy subtitles</button>
 </div>
 `;
 
@@ -51,14 +54,21 @@ const NOTIFY_INVALID_LINK = (additionalContext = "") => {
 const INJECT_USER_INTERFACE = () => {
     DEBUG_LOG("Injecting input box above video player...");
     const CONTENT_SECTION = document.querySelector("#content");
-    CONTENT_SECTION.innerHTML = INPUT_BOX_AND_BUTTON + CONTENT_SECTION.innerHTML;
+    CONTENT_SECTION.innerHTML = INPUT_BOX_AND_BUTTONS + CONTENT_SECTION.innerHTML;
     if (document.querySelector("#animated-captions-ui")) DEBUG_LOG("Input box injected!");
 
     // Inject functionality
     const SUBMIT_BUTTON = document.querySelector("#subtitle-source-submit");
+    const COPY_BUTTON = document.querySelector("#subtitle-source-copy");
     const INPUT_BOX = document.querySelector("#subtitle-source-input");
     SUBMIT_BUTTON.onclick = VALIDATE_LINK;
-    INPUT_BOX.onkeydown = e => { if (e.key === "Enter") VALIDATE_LINK(); };
+    INPUT_BOX.oninput = e => {
+        if (e.key === "Enter") VALIDATE_LINK();
+        SUBMIT_BUTTON.disabled = !INPUT_BOX.value;
+        // COPY_BUTTON.disabled = !INPUT_BOX.value;
+        // Only allow for copy after apply
+        COPY_BUTTON.disabled = true;
+    };
 };
 
 const VALIDATE_LINK = () => {
@@ -124,6 +134,8 @@ const PROCESS_VTT_FROM_DMAIL = () => {
     const DMAIL_IFRAME = document.querySelector("#subtitles-source");
     const RAW_VTT = DMAIL_IFRAME.contentWindow.document.querySelector("div.prose").innerText;
 
+    MAKE_WEBVTT_HUMAN_READABLE(RAW_VTT);
+
     // Delete iframe after use
     DMAIL_IFRAME.hidden = true;
     DMAIL_IFRAME.remove();
@@ -145,16 +157,19 @@ const PROCESS_VTT_FROM_EXTERNAL = (xhr) => {
         return;
     }
 
+    MAKE_WEBVTT_HUMAN_READABLE(RAW_VTT);
+
     const ENCODED_VTT = RAW_VTT.split("\n").join("%0A");
     CREATE_AND_ATTACH_SUBTITLES(`data:text/vtt,${ENCODED_VTT}`);
 };
 
-const CREATE_AND_ATTACH_SUBTITLES = (vttData) => {
+// vttDataURL is a string in the format of `data:text/vtt,WEBVTT%0A...`
+const CREATE_AND_ATTACH_SUBTITLES = (vttDataURL) => {
     const VIDEO_ELEMENT = document.querySelector("video#image");
     if (!VIDEO_ELEMENT) { DEBUG_LOG("Unable to get video element!"); return; }
 
     const SUBTITLES = document.createElement("track");
-    SUBTITLES.src = vttData;
+    SUBTITLES.src = vttDataURL;
     SUBTITLES.kind = "subtitles";
     SUBTITLES.srclang = "en";
     SUBTITLES.label = "English";
@@ -195,6 +210,86 @@ const CHECK_FOR_WEBVTT_LINKS = () => {
 
         return;
     }
+};
+
+// vttRaw is a string in the format of `WEBVTT\n1\n00:...`
+// Convert that string into readable text format:
+// <time stamp><space><cue text>
+// e.g. 0:01 Bocchi-chan! Bocchi-chan!
+const MAKE_WEBVTT_HUMAN_READABLE = (vttRaw) => {
+    DEBUG_LOG("Converting raw VTT text into human-readable text...");
+
+    // Any line containing "-->" is a time stamp line
+    // Any line that comes after that isn't an empty new line are cue texts
+
+    const TIME_STAMPS = [];
+    const CUES = [];
+
+    // Compile time stamps and cue texts
+    const LINES = vttRaw.split("\n");
+    let is_cue_text = false;
+    let buffer = "";
+    for (const LINE of LINES) {
+        // Time stamp line
+        if (LINE.includes("-->")) {
+            TIME_STAMPS.push(GET_TIME_STAMP(LINE));
+            is_cue_text = true;
+            continue;
+        }
+
+        // Empty line
+        if (LINE.trim() === "") {
+            if (buffer) CUES.push(buffer.trim());
+            buffer = "";
+            is_cue_text = false;
+        }
+
+        // Cue line
+        if (is_cue_text) buffer += LINE.trim() + " ";
+    }
+    DEBUG_LOG(`Parsed ${TIME_STAMPS.length} time stamps and ${CUES.length} cues`);
+
+    // Join to a string
+    if (TIME_STAMPS.length !== CUES.length) { DEBUG_LOG("Time stamp and cue mismatch! Aborting..."); return; }
+    buffer = "";
+    for (let i = 0; i < TIME_STAMPS.length; i++) {
+        buffer += `${TIME_STAMPS[i]} ${CUES[i]}\n`;
+    }
+
+    // Copy to clipboard
+    const COPY_BUTTON = document.querySelector("#subtitle-source-copy");
+    COPY_BUTTON.onclick = () => {
+        navigator.clipboard.writeText(buffer);
+        Danbooru.notice("Subtitles copied to clipboard! Paste in artist commentary or comments for others to see.");
+    };
+    COPY_BUTTON.disabled = false;
+};
+
+const GET_TIME_STAMP = (lineContainingTimeStamp) => {
+    // "00:00:25.676 --> 00:00:27.542" becomes "00:00:25"
+    const INDEX_OF_DOT = lineContainingTimeStamp.indexOf(".");
+    const TIME_STAMP = lineContainingTimeStamp.substr(0, INDEX_OF_DOT);
+
+    return TIME_STAMP;
+};
+
+const TRIM_TIME_STAMP = (timeStamps) => {
+    // HH:MM:SS --> MM:SS or M:SS if possible
+    const LAST_TIME_STAMP = timeStamps[timeStamps.length - 1];
+
+    // TODO
+
+    let charsToTrim = 0;
+    for (const CHAR of LAST_TIME_STAMP) {
+        if (CHAR === ":" || CHAR === "0") { charsToTrim++; continue; }
+        break;
+    }
+
+    for (let i = 0; i < timeStamps.length; i++) {
+        timeStamps[i] = timeStamps[i].substr();
+    }
+
+    return timeStamps;
 };
 
 // ------------------------------------ MAIN ------------------------------------
