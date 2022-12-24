@@ -34,9 +34,9 @@ If you would like to create VTT subtitle files manually via a text editor, you c
 
 Alternatively, there are subtitle editor softwares out there that export to `.vtt`, such as [VTT Creator](https://www.vtt-creator.com/) (web-based) or [SubtitleEdit](https://github.com/SubtitleEdit/subtitleedit) (downloadable software).
 
-## **For non-users**
+~~In order to cater towards users who aren't using the script, subtitlers would have to rewrite the time-stamped text in the artist commentary section in addition to the WebVTT file. For that, I'm thinking of adding a generator that can convert `.vtt` into simpler, human-readable format.~~
 
-In order to cater towards users who aren't using the script, subtitlers would have to rewrite the time-stamped text in the artist commentary section in addition to the WebVTT file. For that, I'm thinking of adding a generator that can convert `.vtt` into simpler, human-readable format.
+Subtitlers can also click on the `Copy subtitles!` button next to the `Apply subtitles!` button for a human-readable version of subtitles, instead of rewriting the entire subtitles for other users to see.
 
 ## **Known issues**
 
